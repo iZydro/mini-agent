@@ -1,0 +1,103 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f4f5f7;
+  color: #172b4d;
+}
+
+.app {
+  max-width: 900px;
+  height: 100vh;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  background: white;
+}
+
+header {
+  padding: 18px 24px;
+  border-bottom: 1px solid #ddd;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+header p {
+  margin: 4px 0 0;
+  color: #667085;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.message {
+  display: flex;
+  margin-bottom: 16px;
+}
+
+.message.user {
+  justify-content: flex-end;
+}
+
+.bubble {
+  max-width: 75%;
+  padding: 12px 14px;
+  border-radius: 14px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.user .bubble {
+  background: #0052cc;
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.agent .bubble {
+  background: #f1f2f4;
+  color: #172b4d;
+  border-bottom-left-radius: 4px;
+}
+
+.composer {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid #ddd;
+  background: white;
+}
+
+textarea {
+  flex: 1;
+  resize: none;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  padding: 12px;
+  font: inherit;
+  min-height: 46px;
+  max-height: 160px;
+}
+
+button {
+  border: 0;
+  border-radius: 10px;
+  padding: 0 18px;
+  font: inherit;
+  background: #0052cc;
+  color: white;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

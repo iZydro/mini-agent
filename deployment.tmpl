@@ -1,0 +1,63 @@
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: ${SERVICE}-deployment
+spec:
+  selector:
+    matchLabels:
+      app: ${SERVICE}
+  replicas: 1 # tells deployment to run 1 pod matching the template
+  template:
+    metadata:
+      labels:
+        app: ${SERVICE}
+    spec:
+      serviceAccountName: pods-service-account
+      containers:
+      - name: ${SERVICE}
+        image: ${ECR}/${PREFIX}${SERVICE}:${TAG}
+        ports:
+        - containerPort: 80
+        env:
+          - name: OPENAI_API_KEY
+            valueFrom:
+              secretKeyRef:
+                key: OPENAI_API_KEY
+                name: one-tool-secret
+                optional: false
+          - name: JIRA_BASE_URL
+            valueFrom:
+              secretKeyRef:
+                key: JIRA_BASE_URL
+                name: one-tool-secret
+                optional: false
+          - name: JIRA_EMAIL
+            valueFrom:
+              secretKeyRef:
+                key: JIRA_EMAIL
+                name: one-tool-secret
+                optional: false
+          - name: JIRA_API_TOKEN
+            valueFrom:
+              secretKeyRef:
+                key: JIRA_API_TOKEN
+                name: one-tool-secret
+                optional: false
+          - name: CONFLUENCE_BASE_URL
+            valueFrom:
+              secretKeyRef:
+                key: CONFLUENCE_BASE_URL
+                name: one-tool-secret
+                optional: false
+          - name: CONFLUENCE_EMAIL
+            valueFrom:
+              secretKeyRef:
+                key: CONFLUENCE_EMAIL
+                name: one-tool-secret
+                optional: false
+          - name: CONFLUENCE_API_TOKEN
+            valueFrom:
+              secretKeyRef:
+                key: CONFLUENCE_API_TOKEN
+                name: one-tool-secret
+                optional: false

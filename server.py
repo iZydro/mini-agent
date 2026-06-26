@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from agent import create_initial_messages, run_agent
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
 
@@ -10,13 +13,6 @@ sessions = {}
 class ChatRequest(BaseModel):
     session_id: str
     message: str
-
-@app.get("/")
-def root():
-    return {
-        "name": "mini-agent",
-        "status": "ok"
-    }
 
 
 @app.get("/health")
@@ -36,3 +32,10 @@ def chat(request: ChatRequest):
         "session_id": request.session_id,
         "answer": answer
     }
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+def root():
+    return FileResponse("static/index.html")
+
