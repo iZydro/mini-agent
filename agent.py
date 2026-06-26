@@ -1,9 +1,11 @@
 import os
 import json
 import importlib.util
-from openai import OpenAI
-
+import time
 import config
+from debug import DebugLogger
+from transcript import Transcript
+from openai import OpenAI
 
 client = OpenAI()
 
@@ -34,6 +36,15 @@ def load_tools(base_dir="tools"):
 
 tool_definitions, available_tools = load_tools()
 
+debug = DebugLogger(
+    enabled=True,
+    show_results=False,
+    max_result_chars=3000
+)
+
+transcript = Transcript()
+
+
 def create_initial_messages():
     return [
         {
@@ -56,18 +67,46 @@ def run_agent(messages, user_input):
         "content": user_input
     })
 
-    max_steps = 5
+    transcript.write("user_message", {
+        "content": user_input
+    })
 
-    for step in range(max_steps):
+    max_steps = 5
+    # model = "gpt-4.1-mini"
+    model = "gpt-4.1"
+
+    for step in range(1, max_steps + 1):
+        debug.step(step)
+        debug.model_request(
+            model=model,
+            messages_count=len(messages),
+            tools_count=len(tool_definitions)
+        )
+
         response = client.chat.completions.create(
-            model="gpt-4.1-mini",
+            model=model,
             messages=messages,
             tools=tool_definitions,
             tool_choice="auto",
         )
 
         assistant_message = response.choices[0].message
+
+        transcript.write("assistant_message", {
+            "content": assistant_message.content,
+            "tool_calls": [
+                {
+                    "id": tool_call.id,
+                    "name": tool_call.function.name,
+                    "arguments": tool_call.function.arguments
+                }
+                for tool_call in (assistant_message.tool_calls or [])
+            ]
+        })
+
         messages.append(assistant_message)
+
+        debug.model_response(assistant_message)
 
         if not assistant_message.tool_calls:
             return assistant_message.content
@@ -76,16 +115,32 @@ def run_agent(messages, user_input):
             tool_name = tool_call.function.name
             arguments = json.loads(tool_call.function.arguments or "{}")
 
-            print(f"\n[tool call] {tool_name}({arguments})")
+            transcript.write("tool_start", {
+                "name": tool_name,
+                "arguments": arguments
+            })
 
-            tool_fn = available_tools[tool_name]
+            debug.tool_start(tool_name, arguments)
+            start = time.time()
 
             try:
+                tool_fn = available_tools[tool_name]
                 result = tool_fn(**arguments)
+                elapsed_ms = (time.time() - start) * 1000
+                debug.tool_end(tool_name, result, elapsed_ms)
+
             except Exception as e:
+                elapsed_ms = (time.time() - start) * 1000
                 result = {
                     "error": str(e)
                 }
+                debug.tool_error(tool_name, e, elapsed_ms)
+
+            transcript.write("tool_result", {
+                "name": tool_name,
+                "elapsed_ms": elapsed_ms,
+                "result": result
+            })
 
             messages.append({
                 "role": "tool",
