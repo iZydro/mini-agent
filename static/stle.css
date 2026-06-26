@@ -101,3 +101,37 @@ button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.trace {
+  margin: 4px 24px;
+  font-size: 13px;
+  color: #667085;
+}
+
+.agent-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.agent-trace {
+  font-size: 13px;
+  color: #667085;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 8px;
+}
+
+.trace {
+  margin: 3px 0;
+}
+
+.agent-content {
+  white-space: pre-wrap;
+}
+
+.message-label {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.75;
+  margin-bottom: 6px;
+}

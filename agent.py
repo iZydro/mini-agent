@@ -61,23 +61,24 @@ def create_initial_messages():
     ]
 
 
-def run_agent(messages, user_input):
+def run_agent(messages, user_input, events, session_id):
     messages.append({
         "role": "user",
         "content": user_input
     })
 
-    transcript.write("user_message", {
-        "content": user_input
-    })
+    events.emit(session_id, "user_message", content=user_input)
 
     max_steps = 5
     # model = "gpt-4.1-mini"
     model = "gpt-4.1"
 
     for step in range(1, max_steps + 1):
-        debug.step(step)
-        debug.model_request(
+        events.emit(session_id, "agent_step", step=step)
+
+        events.emit(
+            session_id,
+            "llm_request",
             model=model,
             messages_count=len(messages),
             tools_count=len(tool_definitions)
@@ -91,56 +92,85 @@ def run_agent(messages, user_input):
         )
 
         assistant_message = response.choices[0].message
+        messages.append(assistant_message)
 
-        transcript.write("assistant_message", {
-            "content": assistant_message.content,
-            "tool_calls": [
+        tool_calls = assistant_message.tool_calls or []
+
+        if not tool_calls:
+            content = assistant_message.content or ""
+
+            events.emit(
+                session_id, 
+                "llm_final_answer",
+                content=content,
+                chars=len(content)
+            )
+
+            events.emit(
+                session_id, 
+                "assistant_message",
+                content=content
+            )
+
+            return content
+
+        events.emit(
+            session_id, 
+            "llm_tool_calls",
+            count=len(tool_calls)
+        )
+
+        events.emit(
+            session_id, 
+            "assistant_message",
+            content=assistant_message.content,
+            tool_calls=[
                 {
                     "id": tool_call.id,
                     "name": tool_call.function.name,
                     "arguments": tool_call.function.arguments
                 }
-                for tool_call in (assistant_message.tool_calls or [])
+                for tool_call in tool_calls
             ]
-        })
+        )
 
-        messages.append(assistant_message)
-
-        debug.model_response(assistant_message)
-
-        if not assistant_message.tool_calls:
-            return assistant_message.content
-
-        for tool_call in assistant_message.tool_calls:
+        for tool_call in tool_calls:
             tool_name = tool_call.function.name
             arguments = json.loads(tool_call.function.arguments or "{}")
 
-            transcript.write("tool_start", {
-                "name": tool_name,
-                "arguments": arguments
-            })
+            events.emit(
+                session_id, 
+                "tool_start",
+                tool=tool_name,
+                arguments=arguments
+            )
 
-            debug.tool_start(tool_name, arguments)
             start = time.time()
 
             try:
                 tool_fn = available_tools[tool_name]
                 result = tool_fn(**arguments)
                 elapsed_ms = (time.time() - start) * 1000
-                debug.tool_end(tool_name, result, elapsed_ms)
+
+                events.emit(
+                    session_id, 
+                    "tool_end",
+                    tool=tool_name,
+                    elapsed_ms=elapsed_ms,
+                    result=result
+                )
 
             except Exception as e:
                 elapsed_ms = (time.time() - start) * 1000
-                result = {
-                    "error": str(e)
-                }
-                debug.tool_error(tool_name, e, elapsed_ms)
+                result = {"error": str(e)}
 
-            transcript.write("tool_result", {
-                "name": tool_name,
-                "elapsed_ms": elapsed_ms,
-                "result": result
-            })
+                events.emit(
+                    session_id, 
+                    "tool_error",
+                    tool=tool_name,
+                    elapsed_ms=elapsed_ms,
+                    error=str(e)
+                )
 
             messages.append({
                 "role": "tool",
@@ -152,6 +182,17 @@ def run_agent(messages, user_input):
 
 
 if __name__ == "__main__":
+    from core.event_bus import EventBus
+    from listeners.console import ConsoleListener
+    from listeners.transcript import TranscriptListener
+    from transcript import Transcript
+
+    events = EventBus()
+    events.register(ConsoleListener(enabled=True, show_results=False))
+    events.register(TranscriptListener(Transcript()))
+
+    session_id = "cli"
+    
     messages = create_initial_messages()
 
     while True:
@@ -160,5 +201,5 @@ if __name__ == "__main__":
         if user_input.lower() in ["exit", "quit", "salir"]:
             break
 
-        answer = run_agent(messages, user_input)
+        answer = run_agent(messages, user_input, events, session_id)
         print(f"\nAgente > {answer}")
