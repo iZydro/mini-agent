@@ -45,7 +45,7 @@ class Tool:
         }
     }
 
-    def execute(self, query, space_key=None, label=None, limit=10):
+    def execute(self, query, space_key=None, label=None, limit=10, context=None):
 
         if not CONFLUENCE_BASE_URL or not CONFLUENCE_EMAIL or not CONFLUENCE_API_TOKEN:
             raise ValueError("Faltan variables de Confluence en .env")
@@ -63,6 +63,9 @@ class Tool:
         api_calls = []
 
         for strategy, cql in attempts:
+            if context:
+                context.info(f"Probando estrategia {strategy}", strategy=strategy)
+
             pages, api_trace = self.search_cql(cql, limit)
             api_trace["strategy"] = strategy
             api_calls.append(api_trace)
@@ -172,7 +175,81 @@ class Tool:
 
         return " AND ".join(clauses) + " ORDER BY lastmodified DESC"
 
-    def search_cql(self, cql, limit):
+
+    def search_cql(self, cql, limit, context=None, strategy=None):
+        url = f"{CONFLUENCE_BASE_URL.rstrip('/')}/wiki/rest/api/search"
+
+        params = {
+            "cql": cql,
+            "limit": limit,
+            "expand": "content.space"
+        }
+
+        pending_trace = ApiTrace.pending(
+            method="GET",
+            url=url,
+            query=params
+        ).to_dict()
+
+        if strategy:
+            pending_trace["strategy"] = strategy
+
+        if context:
+            context.api_call_start(pending_trace)
+
+        response = requests.get(
+            url,
+            auth=(CONFLUENCE_EMAIL, CONFLUENCE_API_TOKEN),
+            headers={"Accept": "application/json"},
+            params=params,
+            timeout=20
+        )
+
+        api_trace = ApiTrace.from_response(
+            method="GET",
+            url=url,
+            response=response,
+            query=params
+        ).to_dict()
+
+        if strategy:
+            api_trace["strategy"] = strategy
+
+        if context:
+            context.api_call_end(api_trace)
+
+        response.raise_for_status()
+        data = response.json()
+
+        results = []
+
+        for item in data.get("results", []):
+            content = item.get("content") or {}
+            space = content.get("space") or {}
+            links = content.get("_links") or {}
+            webui = links.get("webui")
+
+            results.append({
+                "id": content.get("id"),
+                "title": content.get("title"),
+                "type": content.get("type"),
+                "space_key": space.get("key"),
+                "space_name": space.get("name"),
+                "excerpt": item.get("excerpt"),
+                "url": f"{CONFLUENCE_BASE_URL.rstrip('/')}/wiki{webui}" if webui else None
+            })
+
+        if context:
+            context.progress(
+                f"{len(results)} páginas encontradas",
+                count=len(results),
+                strategy=strategy
+            )
+
+        return results, api_trace
+
+
+    def search_cql___(self, cql, limit):
         url = f"{CONFLUENCE_BASE_URL.rstrip('/')}/wiki/rest/api/search"
 
         params = {

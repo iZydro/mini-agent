@@ -42,6 +42,16 @@ class ApiTrace:
     elapsed_ms: int | None = None
 
     @classmethod
+    def pending(cls, method, url, query=None):
+        return cls(
+            method=method,
+            url=url,
+            query=query or {},
+            status_code=None,
+            elapsed_ms=None
+        )
+
+    @classmethod
     def from_response(cls, method, url, response, query=None):
         return cls(
             method=method,
@@ -50,7 +60,7 @@ class ApiTrace:
             status_code=response.status_code,
             elapsed_ms=round(response.elapsed.total_seconds() * 1000)
         )
-
+    
     def to_dict(self):
         parsed = urlparse(self.url)
 
@@ -62,4 +72,4 @@ class ApiTrace:
             "query": sanitize_dict(self.query),
             "status_code": self.status_code,
             "elapsed_ms": self.elapsed_ms
-        }
+        }    

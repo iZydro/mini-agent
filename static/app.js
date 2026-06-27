@@ -92,6 +92,36 @@ eventSource.onmessage = (event) => {
         setAgentContent(data.content || "(sin respuesta)");
         currentAgentMessage = null;
     }
+
+    if (data.type === "tool_info") {
+    addTraceFromEvent(data, `ℹ️ ${data.message}`);
+    }
+
+    if (data.type === "tool_progress") {
+    addTraceFromEvent(data, `📌 ${data.message}`);
+    }
+
+    if (data.type === "api_call_start") {
+    const api = data.api;
+    addTraceFromEvent(
+        data,
+        `🌐 ${api.method} ${api.host}${api.path}`
+    );
+
+    if (api.query && Object.keys(api.query).length) {
+        for (const [key, value] of Object.entries(api.query)) {
+        addTraceFromEvent(data, `   ${key}: ${value}`);
+        }
+    }
+    }
+
+    if (data.type === "api_call_end") {
+    const api = data.api;
+    addTraceFromEvent(
+        data,
+        `✅ ${api.status_code} · ${api.elapsed_ms} ms`
+    );
+    }
 };
 
 function addUserMessage(text) {

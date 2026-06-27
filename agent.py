@@ -6,7 +6,10 @@ import config
 from debug import DebugLogger
 from transcript import Transcript
 from core.tool_result import ToolResult
+import inspect
+from core.tool_context import ToolContext
 from openai import OpenAI
+
 
 client = OpenAI()
 
@@ -152,7 +155,20 @@ def run_agent(messages, user_input, events, session_id):
 
             try:
                 tool_fn = available_tools[tool_name]
-                tool_result = tool_fn(**arguments)
+
+                # tool_result = tool_fn(**arguments)
+                context = ToolContext(
+                    events=events,
+                    session_id=session_id,
+                    tool_name=tool_name
+                )
+
+                signature = inspect.signature(tool_fn)
+
+                if "context" in signature.parameters:
+                    tool_result = tool_fn(context=context, **arguments)
+                else:
+                    tool_result = tool_fn(**arguments)
 
                 if not isinstance(tool_result, ToolResult):
                     print(f"[legacy tool] {tool_name}")

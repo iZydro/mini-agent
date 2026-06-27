@@ -45,11 +45,20 @@ class Tool:
         }
     }
 
-    def execute(self, page_id):
+    def execute(self, page_id, context=None):
         if not CONFLUENCE_BASE_URL or not CONFLUENCE_EMAIL or not CONFLUENCE_API_TOKEN:
             raise ValueError("Faltan variables de Confluence en .env")
 
         url = f"{CONFLUENCE_BASE_URL.rstrip('/')}/wiki/api/v2/pages/{page_id}"
+
+        pending_trace = ApiTrace.pending(
+            method="GET",
+            url=url,
+            query={"body-format": "storage"}
+        ).to_dict()
+
+        if context:
+            context.api_call_start(pending_trace)
 
         response = requests.get(
             url,
@@ -72,12 +81,23 @@ class Tool:
             }
         ).to_dict()
 
+        if context:
+            context.api_call_end(api_trace)
+    
         response.raise_for_status()
         page = response.json()
 
         storage = page.get("body", {}).get("storage", {})
         raw_html = storage.get("value", "")
         text = html_to_text(raw_html)
+
+        if context:
+            context.progress(
+                f"Página leída: {page.get('title')}",
+                page_id=page.get("id"),
+                title=page.get("title"),
+                text_chars=len(text or "")
+            )
 
         links = page.get("_links", {})
         webui = links.get("webui")
