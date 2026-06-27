@@ -1,5 +1,7 @@
 import requests
 from config import CONFLUENCE_BASE_URL, CONFLUENCE_EMAIL, CONFLUENCE_API_TOKEN
+import json
+from core.tool_result import ToolResult
 
 
 def escape_cql_value(value):
@@ -58,30 +60,68 @@ class Tool:
         all_attempts = []
 
         for strategy, cql in attempts:
-            result = self.search_cql(cql, limit)
+            pages = self.search_cql(cql, limit)
 
             all_attempts.append({
                 "strategy": strategy,
                 "cql": cql,
-                "count": len(result)
+                "count": len(pages)
             })
 
-            if result:
-                return {
+            if pages:
+                payload = {
                     "query": query,
                     "strategy": strategy,
                     "cql": cql,
-                    "count": len(result),
-                    "results": result,
+                    "count": len(pages),
+                    "results": pages,
                     "attempts": all_attempts
                 }
 
-        return {
+                return ToolResult(
+                    content=json.dumps(payload, ensure_ascii=False),
+                    ui={
+                        "query": query,
+                        "strategy": strategy,
+                        "cql": cql,
+                        "count": len(pages),
+                        "pages": [
+                            {
+                                "id": page.get("id"),
+                                "title": page.get("title"),
+                                "url": page.get("url"),
+                                "space_key": page.get("space_key")
+                            }
+                            for page in pages
+                        ],
+                        "attempts": all_attempts
+                    },
+                    metrics={
+                        "pages": len(pages),
+                        "attempts": len(all_attempts)
+                    }
+                )
+
+        payload = {
             "query": query,
             "count": 0,
             "results": [],
             "attempts": all_attempts
         }
+
+        return ToolResult(
+            content=json.dumps(payload, ensure_ascii=False),
+            ui={
+                "query": query,
+                "count": 0,
+                "pages": [],
+                "attempts": all_attempts
+            },
+            metrics={
+                "pages": 0,
+                "attempts": len(all_attempts)
+            }
+        )
 
     def build_cql(self, field, query, space_key=None, label=None):
         clauses = [

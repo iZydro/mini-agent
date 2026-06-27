@@ -1,6 +1,7 @@
 import requests
 from urllib.parse import urlparse
-
+import json
+from core.tool_result import ToolResult
 
 class Tool:
     name = "http_get_json"
@@ -36,4 +37,17 @@ class Tool:
 
         r = requests.get(url, timeout=10)
         r.raise_for_status()
-        return r.json()
+
+        data = r.json()
+
+        return ToolResult(
+            content=json.dumps(data, ensure_ascii=False),
+            ui={
+                "url": url,
+                "host": parsed.hostname,
+                "status_code": r.status_code
+            },
+            metrics={
+                "bytes": len(r.content)
+            }
+        )

@@ -1,5 +1,6 @@
 import os
-
+import json
+from core.tool_result import ToolResult
 
 class Tool:
     name = "list_dir"
@@ -34,4 +35,19 @@ class Tool:
                 "size": os.path.getsize(full) if os.path.isfile(full) else None
             })
 
-        return items
+        result = {
+            "path": safe_path,
+            "count": len(items),
+            "items": items
+        }
+
+        return ToolResult(
+            content=json.dumps(result, ensure_ascii=False),
+            ui={
+                "path": safe_path,
+                "count": len(items)
+            },
+            metrics={
+                "items": len(items)
+            }
+        )

@@ -1,5 +1,6 @@
 import requests
-
+import json
+from core.tool_result import ToolResult
 
 class Tool:
     name = "get_public_ip"
@@ -20,4 +21,14 @@ class Tool:
     def execute(self):
         r = requests.get("https://api.ipify.org?format=json", timeout=10)
         r.raise_for_status()
-        return r.json()
+    
+        data = r.json()
+
+        return ToolResult(
+            content=json.dumps(data, ensure_ascii=False),
+            ui={
+                "ip": data.get("ip")
+            },
+            metrics={}
+        )
+    

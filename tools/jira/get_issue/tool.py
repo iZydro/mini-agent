@@ -1,6 +1,8 @@
 import re
 import requests
 from config import JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN
+import json
+from core.tool_result import ToolResult
 
 
 def adf_to_text(node):
@@ -95,7 +97,8 @@ class Tool:
         priority = fields.get("priority") or {}
         issue_type = fields.get("issuetype") or {}
 
-        return {
+
+        result = {
             "key": issue.get("key"),
             "url": f"{JIRA_BASE_URL.rstrip('/')}/browse/{issue.get('key')}",
             "summary": fields.get("summary"),
@@ -115,6 +118,22 @@ class Tool:
             "updated": fields.get("updated"),
             "comments": comments
         }
+
+        return ToolResult(
+            content=json.dumps(result, ensure_ascii=False),
+            ui={
+                "key": result["key"],
+                "summary": result["summary"],
+                "url": result["url"],
+                "comments": len(comments),
+                "status": result["status"]
+            },
+            metrics={
+                "comments": len(comments),
+                "description_chars": len(result["description"] or "")
+            }
+        )
+
 
     def get_issue(self, key):
         url = f"{JIRA_BASE_URL.rstrip('/')}/rest/api/3/issue/{key}"

@@ -5,6 +5,7 @@ import time
 import config
 from debug import DebugLogger
 from transcript import Transcript
+from core.tool_result import ToolResult
 from openai import OpenAI
 
 client = OpenAI()
@@ -141,7 +142,7 @@ def run_agent(messages, user_input, events, session_id):
             arguments = json.loads(tool_call.function.arguments or "{}")
 
             events.emit(
-                session_id, 
+                session_id,
                 "tool_start",
                 tool=tool_name,
                 arguments=arguments
@@ -151,33 +152,47 @@ def run_agent(messages, user_input, events, session_id):
 
             try:
                 tool_fn = available_tools[tool_name]
-                result = tool_fn(**arguments)
+                tool_result = tool_fn(**arguments)
+
+                if not isinstance(tool_result, ToolResult):
+                    print(f"[legacy tool] {tool_name}")
+                    tool_result = ToolResult(
+                        content=json.dumps(tool_result, ensure_ascii=False),
+                        ui={"legacy_result": tool_result}
+                    )
+
                 elapsed_ms = (time.time() - start) * 1000
 
                 events.emit(
-                    session_id, 
+                    session_id,
                     "tool_end",
                     tool=tool_name,
                     elapsed_ms=elapsed_ms,
-                    result=result
+                    ui=tool_result.ui,
+                    metrics=tool_result.metrics
                 )
 
             except Exception as e:
                 elapsed_ms = (time.time() - start) * 1000
-                result = {"error": str(e)}
+
+                tool_result = ToolResult(
+                    content=json.dumps({"error": str(e)}, ensure_ascii=False),
+                    ui={"error": str(e)}
+                )
 
                 events.emit(
-                    session_id, 
+                    session_id,
                     "tool_error",
                     tool=tool_name,
                     elapsed_ms=elapsed_ms,
-                    error=str(e)
+                    error=str(e),
+                    ui=tool_result.ui
                 )
 
             messages.append({
                 "role": "tool",
                 "tool_call_id": tool_call.id,
-                "content": json.dumps(result, ensure_ascii=False)
+                "content": tool_result.content
             })
 
     return "He alcanzado el límite de pasos ejecutando tools."

@@ -1,5 +1,7 @@
 import requests
 from config import JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN
+import json
+from core.tool_result import ToolResult
 
 
 class Tool:
@@ -133,9 +135,21 @@ class Tool:
                 "updated": fields.get("updated")
             })
 
-        return {
+        result = {
             "jql": jql,
             "count": len(issues),
             "issues": issues
         }
+
+        return ToolResult(
+            content=json.dumps(result, ensure_ascii=False),
+            ui={
+                "jql": jql,
+                "count": len(issues),
+                "keys": [issue["key"] for issue in issues]
+            },
+            metrics={
+                "issues": len(issues)
+            }
+        )
     

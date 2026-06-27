@@ -1,5 +1,7 @@
 import requests
 from config import JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN
+import json
+from core.tool_result import ToolResult
 
 
 def escape_jql(value):
@@ -14,8 +16,9 @@ class Tool:
         "function": {
             "name": "jira_search",
             "description": (
-                "Busca issues de Jira por texto libre en summary, description y texto general. "
-                "Úsala cuando el usuario quiera encontrar tickets sobre un tema, bug, feature o palabra clave."
+                "Busca issues de Jira por texto libre. "
+                "Requiere siempre query. No la uses para listar tickets de un proyecto sin texto de búsqueda; "
+                "para eso usa jira_list_issues."
             ),
             "parameters": {
                 "type": "object",
@@ -62,7 +65,7 @@ class Tool:
             })
 
             if issues:
-                return {
+                result = {
                     "query": query,
                     "strategy": strategy,
                     "jql": jql,
@@ -71,12 +74,41 @@ class Tool:
                     "attempts": all_attempts
                 }
 
-        return {
+                return ToolResult(
+                    content=json.dumps(result, ensure_ascii=False),
+                    ui={
+                        "query": query,
+                        "strategy": strategy,
+                        "jql": jql,
+                        "count": len(issues),
+                        "keys": [issue["key"] for issue in issues],
+                        "attempts": all_attempts
+                    },
+                    metrics={
+                        "issues": len(issues),
+                        "attempts": len(all_attempts)
+                    }
+                )
+
+        result = {
             "query": query,
             "count": 0,
             "issues": [],
             "attempts": all_attempts
         }
+
+        return ToolResult(
+            content=json.dumps(result, ensure_ascii=False),
+            ui={
+                "query": query,
+                "count": 0,
+                "attempts": all_attempts
+            },
+            metrics={
+                "issues": 0,
+                "attempts": len(all_attempts)
+            }
+        )
 
     def add_project_clause(self, clauses, project):
         if project:

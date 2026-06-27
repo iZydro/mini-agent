@@ -37,11 +37,15 @@ class ConsoleListener:
             print(f"[tool:end] {event['tool']} elapsed={event['elapsed_ms']:.0f}ms")
 
             if self.show_results:
-                text = json.dumps(event.get("result"), indent=2, ensure_ascii=False)
-                if len(text) > self.max_result_chars:
-                    text = text[:self.max_result_chars] + "\n... [truncated]"
-                print(text)
 
+                print(
+                    json.dumps(
+                        event.get("ui", {}),
+                        indent=2,
+                        ensure_ascii=False
+                    )
+                )
+                
         elif event_type == "tool_error":
             print(
                 f"[tool:error] {event['tool']} "

@@ -1,4 +1,5 @@
 from openai import OpenAI
+from core.tool_result import ToolResult
 
 client = OpenAI()
 
@@ -44,11 +45,47 @@ class Tool:
             )
         )
 
-        print("=" * 80)
-        print(response.model_dump_json(indent=2))
-        print("=" * 80)
+        # print("=" * 80)
+        # print(response.model_dump_json(indent=2))
+        # print("=" * 80)
 
-        return {
-            "query": query,
-            "answer": response.output_text
-        }
+        searches = []
+        opened_pages = []
+        citations = []
+
+        for item in response.output:
+            if item.type == "web_search_call":
+                action = item.action
+
+                if action.type == "search":
+                    searches.extend(getattr(action, "queries", []) or [])
+
+                elif action.type == "open_page":
+                    opened_pages.append({
+                        "url": getattr(action, "url", None)
+                    })
+
+            elif item.type == "message":
+                for content in item.content:
+                    for annotation in getattr(content, "annotations", []) or []:
+                        if annotation.type == "url_citation":
+                            citations.append({
+                                "title": annotation.title,
+                                "url": annotation.url
+                            })
+
+        return ToolResult(
+            content=response.output_text,
+            ui={
+                "query": query,
+                "searches": searches,
+                "opened_pages": opened_pages,
+                "citations": citations
+            },
+            metrics={
+                "search_requests": (response.tool_usage or {})
+                    .get("web_search", {})
+                    .get("num_requests", 0)
+            }
+        )
+    

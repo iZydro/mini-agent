@@ -2,6 +2,8 @@ import re
 import html
 import requests
 from config import CONFLUENCE_BASE_URL, CONFLUENCE_EMAIL, CONFLUENCE_API_TOKEN
+import json
+from core.tool_result import ToolResult
 
 
 def html_to_text(value):
@@ -70,7 +72,7 @@ class Tool:
         links = page.get("_links", {})
         webui = links.get("webui")
 
-        return {
+        tool_payload = {
             "id": page.get("id"),
             "title": page.get("title"),
             "status": page.get("status"),
@@ -79,3 +81,16 @@ class Tool:
             "url": f"{CONFLUENCE_BASE_URL.rstrip('/')}{webui}" if webui else None,
             "text": text[:12000]
         }
+
+        return ToolResult(
+            content=json.dumps(tool_payload, ensure_ascii=False),
+            ui={
+                "id": tool_payload["id"],
+                "title": tool_payload["title"],
+                "url": tool_payload["url"],
+                "text_chars": len(tool_payload["text"] or "")
+            },
+            metrics={
+                "text_chars": len(tool_payload["text"] or "")
+            }
+        )

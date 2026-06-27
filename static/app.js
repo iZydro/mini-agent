@@ -21,17 +21,42 @@ eventSource.onmessage = (event) => {
     addTrace(`🔧 ${data.tool}`);
   }
 
-  if (data.type === "tool_end") {
-    addTrace(`✅ ${data.tool} (${Math.round(data.elapsed_ms)} ms)`);
-    updateExecutionHeader();
-  }
+    if (data.type === "tool_end") {
+    const elapsed = data.elapsed_ms != null
+        ? `${Math.round(data.elapsed_ms)} ms`
+        : "? ms";
 
-  if (data.type === "tool_error") {
-    addTrace(`❌ ${data.tool}: ${data.error}`);
-    updateExecutionHeader();
-  }
+    addTrace(`✅ ${data.tool} (${elapsed})`);
 
-  if (data.type === "llm_final_answer") {
+    if (data.tool === "web_search" && data.ui) {
+        if (data.ui.searches?.length) {
+        addTrace("🔍 Búsquedas:");
+        for (const search of data.ui.searches) {
+            addTrace(`   ${search}`);
+        }
+        }
+
+        if (data.ui.citations?.length) {
+        addTrace("📄 Fuentes:");
+        for (const citation of data.ui.citations) {
+            addTrace(`   ${citation.title}`);
+        }
+        }
+    }
+
+    updateExecutionHeader();
+    }
+
+    if (data.type === "tool_error") {
+    const elapsed = data.elapsed_ms != null
+        ? `${Math.round(data.elapsed_ms)} ms`
+        : "? ms";
+
+    addTrace(`❌ ${data.tool} (${elapsed}): ${data.error}`);
+    updateExecutionHeader();
+    }
+
+    if (data.type === "llm_final_answer") {
     setAgentContent(data.content || "(sin respuesta)");
     currentAgentMessage = null;
   }
