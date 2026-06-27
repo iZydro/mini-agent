@@ -1,9 +1,12 @@
 const sessionId = crypto.randomUUID();
 
-const eventSource = new EventSource(`/api/events/${sessionId}`);
+const messages = document.getElementById("messages");
+const form = document.getElementById("form");
+const input = document.getElementById("input");
 
-let currentAgentBubble = null;
 let currentAgentMessage = null;
+
+const eventSource = new EventSource(`/api/events/${sessionId}`);
 
 eventSource.onmessage = (event) => {
   const data = JSON.parse(event.data);
@@ -11,7 +14,7 @@ eventSource.onmessage = (event) => {
   if (!currentAgentMessage) return;
 
   if (data.type === "llm_request") {
-    currentAgentMessage.content.textContent = "Pensando...";
+    setAgentStatus("Pensando...");
   }
 
   if (data.type === "tool_start") {
@@ -20,33 +23,19 @@ eventSource.onmessage = (event) => {
 
   if (data.type === "tool_end") {
     addTrace(`✅ ${data.tool} (${Math.round(data.elapsed_ms)} ms)`);
+    updateExecutionHeader();
   }
 
   if (data.type === "tool_error") {
     addTrace(`❌ ${data.tool}: ${data.error}`);
+    updateExecutionHeader();
   }
 
   if (data.type === "llm_final_answer") {
-    currentAgentMessage.content.textContent = data.content || "(sin respuesta)";
+    setAgentContent(data.content || "(sin respuesta)");
+    currentAgentMessage = null;
   }
 };
-
-const messages = document.getElementById("messages");
-const form = document.getElementById("form");
-const input = document.getElementById("input");
-
-const source = new EventSource("/api/events");
-
-function addTrace(text) {
-  if (!currentAgentMessage) return;
-
-  const div = document.createElement("div");
-  div.className = "trace";
-  div.textContent = text;
-
-  currentAgentMessage.trace.appendChild(div);
-  scrollToBottom();
-}
 
 function addUserMessage(text) {
   const wrapper = document.createElement("div");
@@ -66,6 +55,7 @@ function addUserMessage(text) {
   bubble.appendChild(content);
   wrapper.appendChild(bubble);
   messages.appendChild(wrapper);
+
   scrollToBottom();
 }
 
@@ -80,41 +70,89 @@ function addAgentMessage() {
   label.className = "message-label";
   label.textContent = "Agente";
 
-  const trace = document.createElement("div");
-  trace.className = "agent-trace";
+  const execution = document.createElement("div");
+  execution.className = "execution";
+
+  const executionHeader = document.createElement("div");
+  executionHeader.className = "execution-header";
+  executionHeader.textContent = "▼ Ejecución";
+
+  const executionBody = document.createElement("div");
+  executionBody.className = "execution-body";
+
+  executionHeader.addEventListener("click", () => {
+    execution.classList.toggle("collapsed");
+
+    const prefix = execution.classList.contains("collapsed") ? "▶" : "▼";
+    executionHeader.textContent = `${prefix} Ejecución`;
+  });
+
+  execution.appendChild(executionHeader);
+  execution.appendChild(executionBody);
 
   const content = document.createElement("div");
   content.className = "agent-content";
   content.textContent = "Pensando...";
 
   bubble.appendChild(label);
-  bubble.appendChild(trace);
+  bubble.appendChild(execution);
   bubble.appendChild(content);
   wrapper.appendChild(bubble);
   messages.appendChild(wrapper);
+
   scrollToBottom();
 
-  return { wrapper, bubble, trace, content };
+  return {
+    wrapper,
+    bubble,
+    execution,
+    executionHeader,
+    executionBody,
+    content,
+    toolCount: 0
+  };
+}
+
+function addTrace(text) {
+  if (!currentAgentMessage) return;
+
+  const div = document.createElement("div");
+  div.className = "trace";
+  div.textContent = text;
+
+  currentAgentMessage.executionBody.appendChild(div);
+
+  if (text.startsWith("🔧")) {
+    currentAgentMessage.toolCount += 1;
+    updateExecutionHeader();
+  }
+
+  scrollToBottom();
+}
+
+function updateExecutionHeader() {
+  if (!currentAgentMessage) return;
+
+  const count = currentAgentMessage.toolCount;
+  currentAgentMessage.executionHeader.textContent =
+    `▼ Ejecución${count ? ` (${count} tools)` : ""}`;
+}
+
+function setAgentStatus(text) {
+  if (!currentAgentMessage) return;
+  currentAgentMessage.content.textContent = text;
+}
+
+function setAgentContent(markdown) {
+  if (!currentAgentMessage) return;
+
+  currentAgentMessage.content.innerHTML = marked.parse(markdown);
+  scrollToBottom();
 }
 
 function scrollToBottom() {
   messages.scrollTop = messages.scrollHeight;
 }
-
-function autoResize() {
-  input.style.height = "auto";
-  input.style.height = `${input.scrollHeight}px`;
-}
-
-source.onmessage = (event) => {
-
-    const data = JSON.parse(event.data);
-
-    console.log(data);
-
-};
-
-input.addEventListener("input", autoResize);
 
 input.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey) {
@@ -130,7 +168,6 @@ form.addEventListener("submit", async (event) => {
   if (!text) return;
 
   input.value = "";
-  autoResize();
 
   addUserMessage(text);
   currentAgentMessage = addAgentMessage();
@@ -157,12 +194,14 @@ form.addEventListener("submit", async (event) => {
     const data = await response.json();
 
     if (currentAgentMessage) {
-        currentAgentMessage.content.textContent = data.answer || "(sin respuesta)";
-        currentAgentMessage = null;
+      setAgentContent(data.answer || "(sin respuesta)");
+      currentAgentMessage = null;
     }
-
   } catch (error) {
-    waitingBubble.textContent = `Error: ${error.message}`;
+    if (currentAgentMessage) {
+      currentAgentMessage.content.textContent = `Error: ${error.message}`;
+      currentAgentMessage = null;
+    }
   } finally {
     input.disabled = false;
     form.querySelector("button").disabled = false;

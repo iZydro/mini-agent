@@ -8,19 +8,21 @@
 <body>
   <main class="app">
     <header>
-      <h1>Mini Agent</h1>
-      <p>Asistente interno</p>
+      <div>
+        <h1>Mini Agent</h1>
+        <p>Asistente interno</p>
+      </div>
     </header>
 
     <section id="messages" class="messages"></section>
 
     <form id="form" class="composer">
-      <textarea id="input" placeholder="Escribe algo..." rows="3" cols="128"></textarea>
-      <br />
+      <textarea id="input" placeholder="Escribe algo..." rows="3"></textarea>
       <button type="submit">Enviar</button>
     </form>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>
