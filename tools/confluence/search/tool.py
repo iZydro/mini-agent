@@ -2,6 +2,7 @@ import requests
 from config import CONFLUENCE_BASE_URL, CONFLUENCE_EMAIL, CONFLUENCE_API_TOKEN
 import json
 from core.tool_result import ToolResult
+from core.api_trace import ApiTrace
 
 
 def escape_cql_value(value):
@@ -45,6 +46,7 @@ class Tool:
     }
 
     def execute(self, query, space_key=None, label=None, limit=10):
+
         if not CONFLUENCE_BASE_URL or not CONFLUENCE_EMAIL or not CONFLUENCE_API_TOKEN:
             raise ValueError("Faltan variables de Confluence en .env")
 
@@ -58,9 +60,12 @@ class Tool:
         ]
 
         all_attempts = []
+        api_calls = []
 
         for strategy, cql in attempts:
-            pages = self.search_cql(cql, limit)
+            pages, api_trace = self.search_cql(cql, limit)
+            api_trace["strategy"] = strategy
+            api_calls.append(api_trace)
 
             all_attempts.append({
                 "strategy": strategy,
@@ -94,7 +99,8 @@ class Tool:
                             }
                             for page in pages
                         ],
-                        "attempts": all_attempts
+                        "attempts": all_attempts,
+                        "api_calls": api_calls
                     },
                     metrics={
                         "pages": len(pages),
@@ -115,7 +121,8 @@ class Tool:
                 "query": query,
                 "count": 0,
                 "pages": [],
-                "attempts": all_attempts
+                "attempts": all_attempts,
+                "api_calls": api_calls
             },
             metrics={
                 "pages": 0,
@@ -168,19 +175,26 @@ class Tool:
     def search_cql(self, cql, limit):
         url = f"{CONFLUENCE_BASE_URL.rstrip('/')}/wiki/rest/api/search"
 
+        params = {
+            "cql": cql,
+            "limit": limit,
+            "expand": "content.space"
+        }
+
         response = requests.get(
             url,
             auth=(CONFLUENCE_EMAIL, CONFLUENCE_API_TOKEN),
-            headers={
-                "Accept": "application/json"
-            },
-            params={
-                "cql": cql,
-                "limit": limit,
-                "expand": "content.space"
-            },
+            headers={"Accept": "application/json"},
+            params=params,
             timeout=20
         )
+
+        api_trace = ApiTrace.from_response(
+            method="GET",
+            url=url,
+            response=response,
+            query=params
+        ).to_dict()
 
         response.raise_for_status()
         data = response.json()
@@ -203,8 +217,9 @@ class Tool:
                 "url": f"{CONFLUENCE_BASE_URL.rstrip('/')}/wiki{webui}" if webui else None
             })
 
-        return results
+        return results, api_trace
     
+
     def build_mixed_cql(self, query, space_key=None, label=None):
         words = [
             word.strip()

@@ -2,6 +2,7 @@ import json
 import requests
 from config import JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN
 from core.tool_result import ToolResult
+from core.api_trace import ApiTrace
 
 
 def escape_jql(value):
@@ -86,6 +87,18 @@ class Tool:
         )
 
         response.raise_for_status()
+
+        api_trace = ApiTrace.from_response(
+            method="POST",
+            url=url,
+            response=response,
+            query={
+                "jql": jql,
+                "maxResults": payload["maxResults"],
+                "fields": payload["fields"]
+            }
+        ).to_dict()        
+
         data = response.json()
 
         issues = []
@@ -121,7 +134,8 @@ class Tool:
             ui={
                 "jql": jql,
                 "count": len(issues),
-                "keys": [issue["key"] for issue in issues]
+                "keys": [issue["key"] for issue in issues],
+                "api_calls": [api_trace]
             },
             metrics={
                 "issues": len(issues)

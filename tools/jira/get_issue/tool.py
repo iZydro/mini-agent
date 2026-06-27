@@ -3,6 +3,7 @@ import requests
 from config import JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN
 import json
 from core.tool_result import ToolResult
+from core.api_trace import ApiTrace
 
 
 def adf_to_text(node):
@@ -86,8 +87,13 @@ class Tool:
         if not JIRA_BASE_URL or not JIRA_EMAIL or not JIRA_API_TOKEN:
             raise ValueError("Faltan variables Jira en .env")
 
-        issue = self.get_issue(key)
-        comments = self.get_comments(key, max_comments)
+        issue, issue_api_trace = self.get_issue(key)
+        comments, comments_api_trace = self.get_comments(key, max_comments)
+
+        api_calls = [
+            issue_api_trace,
+            comments_api_trace
+        ]
 
         fields = issue.get("fields", {})
 
@@ -126,7 +132,8 @@ class Tool:
                 "summary": result["summary"],
                 "url": result["url"],
                 "comments": len(comments),
-                "status": result["status"]
+                "status": result["status"],
+                "api_calls": api_calls
             },
             metrics={
                 "comments": len(comments),
@@ -163,7 +170,29 @@ class Tool:
         )
 
         response.raise_for_status()
-        return response.json()
+
+        api_trace = ApiTrace.from_response(
+            method="GET",
+            url=url,
+            response=response,
+            query={
+                "fields": ",".join([
+                    "summary",
+                    "description",
+                    "status",
+                    "assignee",
+                    "reporter",
+                    "priority",
+                    "issuetype",
+                    "labels",
+                    "components",
+                    "updated",
+                    "created"
+                ])
+            }
+        ).to_dict()
+
+        return response.json(), api_trace
 
     def get_comments(self, key, max_comments):
         url = f"{JIRA_BASE_URL.rstrip('/')}/rest/api/3/issue/{key}/comment"
@@ -182,6 +211,17 @@ class Tool:
         )
 
         response.raise_for_status()
+
+        api_trace = ApiTrace.from_response(
+            method="GET",
+            url=url,
+            response=response,
+            query={
+                "maxResults": min(int(max_comments or 5), 20),
+                "orderBy": "-created"
+            }
+        ).to_dict()
+
         data = response.json()
 
         comments = []
@@ -196,4 +236,4 @@ class Tool:
                 "body": clean_text(comment.get("body"))[:4000]
             })
 
-        return comments
+        return comments, api_trace

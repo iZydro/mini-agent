@@ -1,5 +1,7 @@
 from openai import OpenAI
 from core.tool_result import ToolResult
+from core.api_trace import ApiTrace
+
 
 client = OpenAI()
 
@@ -51,6 +53,7 @@ class Tool:
 
         searches = []
         opened_pages = []
+        web_calls = []
         citations = []
 
         for item in response.output:
@@ -58,11 +61,18 @@ class Tool:
                 action = item.action
 
                 if action.type == "search":
-                    searches.extend(getattr(action, "queries", []) or [])
+                    web_calls.append({
+                        "type": "search",
+                        "query": getattr(action, "query", None),
+                        "queries": getattr(action, "queries", []) or [],
+                        "status": item.status
+                    })
 
                 elif action.type == "open_page":
-                    opened_pages.append({
-                        "url": getattr(action, "url", None)
+                    web_calls.append({
+                        "type": "open_page",
+                        "url": getattr(action, "url", None),
+                        "status": item.status
                     })
 
             elif item.type == "message":
@@ -78,8 +88,7 @@ class Tool:
             content=response.output_text,
             ui={
                 "query": query,
-                "searches": searches,
-                "opened_pages": opened_pages,
+                "web_calls": web_calls,
                 "citations": citations
             },
             metrics={

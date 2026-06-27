@@ -9,228 +9,259 @@ let currentAgentMessage = null;
 const eventSource = new EventSource(`/api/events/${sessionId}`);
 
 eventSource.onmessage = (event) => {
-  const data = JSON.parse(event.data);
+    const data = JSON.parse(event.data);
 
-  if (!currentAgentMessage) return;
+    if (!currentAgentMessage) return;
 
-  if (data.type === "llm_request") {
-    setAgentStatus("Pensando...");
-  }
-
-  if (data.type === "tool_start") {
-    addTrace(`🔧 ${data.tool}`);
-  }
-
-    if (data.type === "tool_end") {
-    const elapsed = data.elapsed_ms != null
-        ? `${Math.round(data.elapsed_ms)} ms`
-        : "? ms";
-
-    addTrace(`✅ ${data.tool} (${elapsed})`);
-
-    if (data.tool === "web_search" && data.ui) {
-        if (data.ui.searches?.length) {
-        addTrace("🔍 Búsquedas:");
-        for (const search of data.ui.searches) {
-            addTrace(`   ${search}`);
-        }
-        }
-
-        if (data.ui.citations?.length) {
-        addTrace("📄 Fuentes:");
-        for (const citation of data.ui.citations) {
-            addTrace(`   ${citation.title}`);
-        }
-        }
+    if (data.type === "llm_request") {
+        setAgentStatus("Pensando...");
     }
 
-    updateExecutionHeader();
+    if (data.type === "tool_start") {
+        addTrace(`🔧 ${data.tool}`);
+    }
+
+    if (data.type === "tool_end") {
+        const elapsed = data.elapsed_ms != null
+            ? `${Math.round(data.elapsed_ms)} ms`
+            : "? ms";
+
+        addTrace(`✅ ${data.tool} (${elapsed})`);
+
+        if (data.tool === "web_search" && data.ui) {
+            if (data.ui.query) {
+                addTrace(`🌐 Consulta original: ${data.ui.query}`);
+            }
+
+            if (data.ui.web_calls?.length) {
+                addTrace("🔎 Búsquedas web:");
+
+                for (const call of data.ui.web_calls) {
+                    if (call.type === "search") {
+                        addTrace(`   search → ${call.query || "(sin query)"}`);
+
+                        if (call.queries?.length > 1) {
+                            for (const q of call.queries) {
+                                addTrace(`      • ${q}`);
+                            }
+                        }
+                    }
+
+                    if (call.type === "open_page") {
+                        addTrace(`   open_page → ${call.url}`);
+                    }
+                }
+            }
+
+            if (data.ui.citations?.length) {
+                addTrace("📄 Fuentes:");
+
+                for (const citation of data.ui.citations) {
+                    addTrace(`   ${citation.title}`);
+                }
+            }
+        }
+
+        if (data.ui?.api_calls?.length) {
+            addTrace("🌐 API calls:");
+
+            for (const call of data.ui.api_calls) {
+                addTrace(`   ${call.method} ${call.host}${call.path} → ${call.status_code} (${call.elapsed_ms} ms)`);
+
+                if (call.query && Object.keys(call.query).length) {
+                    for (const [key, value] of Object.entries(call.query)) {
+                        addTrace(`      ${key}: ${value}`);
+                    }
+                }
+            }
+        }
+        updateExecutionHeader();
     }
 
     if (data.type === "tool_error") {
-    const elapsed = data.elapsed_ms != null
-        ? `${Math.round(data.elapsed_ms)} ms`
-        : "? ms";
+        const elapsed = data.elapsed_ms != null
+            ? `${Math.round(data.elapsed_ms)} ms`
+            : "? ms";
 
-    addTrace(`❌ ${data.tool} (${elapsed}): ${data.error}`);
-    updateExecutionHeader();
+        addTrace(`❌ ${data.tool} (${elapsed}): ${data.error}`);
+        updateExecutionHeader();
     }
 
     if (data.type === "llm_final_answer") {
-    setAgentContent(data.content || "(sin respuesta)");
-    currentAgentMessage = null;
-  }
+        setAgentContent(data.content || "(sin respuesta)");
+        currentAgentMessage = null;
+    }
 };
 
 function addUserMessage(text) {
-  const wrapper = document.createElement("div");
-  wrapper.className = "message user";
+    const wrapper = document.createElement("div");
+    wrapper.className = "message user";
 
-  const bubble = document.createElement("div");
-  bubble.className = "bubble";
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
 
-  const label = document.createElement("div");
-  label.className = "message-label";
-  label.textContent = "Tú";
+    const label = document.createElement("div");
+    label.className = "message-label";
+    label.textContent = "Tú";
 
-  const content = document.createElement("div");
-  content.textContent = text;
+    const content = document.createElement("div");
+    content.textContent = text;
 
-  bubble.appendChild(label);
-  bubble.appendChild(content);
-  wrapper.appendChild(bubble);
-  messages.appendChild(wrapper);
+    bubble.appendChild(label);
+    bubble.appendChild(content);
+    wrapper.appendChild(bubble);
+    messages.appendChild(wrapper);
 
-  scrollToBottom();
+    scrollToBottom();
 }
 
 function addAgentMessage() {
-  const wrapper = document.createElement("div");
-  wrapper.className = "message agent";
+    const wrapper = document.createElement("div");
+    wrapper.className = "message agent";
 
-  const bubble = document.createElement("div");
-  bubble.className = "bubble agent-bubble";
+    const bubble = document.createElement("div");
+    bubble.className = "bubble agent-bubble";
 
-  const label = document.createElement("div");
-  label.className = "message-label";
-  label.textContent = "Agente";
+    const label = document.createElement("div");
+    label.className = "message-label";
+    label.textContent = "Agente";
 
-  const execution = document.createElement("div");
-  execution.className = "execution";
+    const execution = document.createElement("div");
+    execution.className = "execution";
 
-  const executionHeader = document.createElement("div");
-  executionHeader.className = "execution-header";
-  executionHeader.textContent = "▼ Ejecución";
+    const executionHeader = document.createElement("div");
+    executionHeader.className = "execution-header";
+    executionHeader.textContent = "▼ Ejecución";
 
-  const executionBody = document.createElement("div");
-  executionBody.className = "execution-body";
+    const executionBody = document.createElement("div");
+    executionBody.className = "execution-body";
 
-  executionHeader.addEventListener("click", () => {
-    execution.classList.toggle("collapsed");
+    executionHeader.addEventListener("click", () => {
+        execution.classList.toggle("collapsed");
 
-    const prefix = execution.classList.contains("collapsed") ? "▶" : "▼";
-    executionHeader.textContent = `${prefix} Ejecución`;
-  });
+        const prefix = execution.classList.contains("collapsed") ? "▶" : "▼";
+        executionHeader.textContent = `${prefix} Ejecución`;
+    });
 
-  execution.appendChild(executionHeader);
-  execution.appendChild(executionBody);
+    execution.appendChild(executionHeader);
+    execution.appendChild(executionBody);
 
-  const content = document.createElement("div");
-  content.className = "agent-content";
-  content.textContent = "Pensando...";
+    const content = document.createElement("div");
+    content.className = "agent-content";
+    content.textContent = "Pensando...";
 
-  bubble.appendChild(label);
-  bubble.appendChild(execution);
-  bubble.appendChild(content);
-  wrapper.appendChild(bubble);
-  messages.appendChild(wrapper);
+    bubble.appendChild(label);
+    bubble.appendChild(execution);
+    bubble.appendChild(content);
+    wrapper.appendChild(bubble);
+    messages.appendChild(wrapper);
 
-  scrollToBottom();
+    scrollToBottom();
 
-  return {
-    wrapper,
-    bubble,
-    execution,
-    executionHeader,
-    executionBody,
-    content,
-    toolCount: 0
-  };
+    return {
+        wrapper,
+        bubble,
+        execution,
+        executionHeader,
+        executionBody,
+        content,
+        toolCount: 0
+    };
 }
 
 function addTrace(text) {
-  if (!currentAgentMessage) return;
+    if (!currentAgentMessage) return;
 
-  const div = document.createElement("div");
-  div.className = "trace";
-  div.textContent = text;
+    const div = document.createElement("div");
+    div.className = "trace";
+    div.textContent = text;
 
-  currentAgentMessage.executionBody.appendChild(div);
+    currentAgentMessage.executionBody.appendChild(div);
 
-  if (text.startsWith("🔧")) {
-    currentAgentMessage.toolCount += 1;
-    updateExecutionHeader();
-  }
+    if (text.startsWith("🔧")) {
+        currentAgentMessage.toolCount += 1;
+        updateExecutionHeader();
+    }
 
-  scrollToBottom();
+    scrollToBottom();
 }
 
 function updateExecutionHeader() {
-  if (!currentAgentMessage) return;
+    if (!currentAgentMessage) return;
 
-  const count = currentAgentMessage.toolCount;
-  currentAgentMessage.executionHeader.textContent =
-    `▼ Ejecución${count ? ` (${count} tools)` : ""}`;
+    const count = currentAgentMessage.toolCount;
+    currentAgentMessage.executionHeader.textContent =
+        `▼ Ejecución${count ? ` (${count} tools)` : ""}`;
 }
 
 function setAgentStatus(text) {
-  if (!currentAgentMessage) return;
-  currentAgentMessage.content.textContent = text;
+    if (!currentAgentMessage) return;
+    currentAgentMessage.content.textContent = text;
 }
 
 function setAgentContent(markdown) {
-  if (!currentAgentMessage) return;
+    if (!currentAgentMessage) return;
 
-  currentAgentMessage.content.innerHTML = marked.parse(markdown);
-  scrollToBottom();
+    currentAgentMessage.content.innerHTML = marked.parse(markdown);
+    scrollToBottom();
 }
 
 function scrollToBottom() {
-  messages.scrollTop = messages.scrollHeight;
+    messages.scrollTop = messages.scrollHeight;
 }
 
 input.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.shiftKey) {
-    event.preventDefault();
-    form.requestSubmit();
-  }
+    if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        form.requestSubmit();
+    }
 });
 
 form.addEventListener("submit", async (event) => {
-  event.preventDefault();
+    event.preventDefault();
 
-  const text = input.value.trim();
-  if (!text) return;
+    const text = input.value.trim();
+    if (!text) return;
 
-  input.value = "";
+    input.value = "";
 
-  addUserMessage(text);
-  currentAgentMessage = addAgentMessage();
+    addUserMessage(text);
+    currentAgentMessage = addAgentMessage();
 
-  input.disabled = true;
-  form.querySelector("button").disabled = true;
+    input.disabled = true;
+    form.querySelector("button").disabled = true;
 
-  try {
-    const response = await fetch("/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        session_id: sessionId,
-        message: text
-      })
-    });
+    try {
+        const response = await fetch("/chat", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                session_id: sessionId,
+                message: text
+            })
+        });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (currentAgentMessage) {
+            setAgentContent(data.answer || "(sin respuesta)");
+            currentAgentMessage = null;
+        }
+    } catch (error) {
+        if (currentAgentMessage) {
+            currentAgentMessage.content.textContent = `Error: ${error.message}`;
+            currentAgentMessage = null;
+        }
+    } finally {
+        input.disabled = false;
+        form.querySelector("button").disabled = false;
+        input.focus();
+        scrollToBottom();
     }
-
-    const data = await response.json();
-
-    if (currentAgentMessage) {
-      setAgentContent(data.answer || "(sin respuesta)");
-      currentAgentMessage = null;
-    }
-  } catch (error) {
-    if (currentAgentMessage) {
-      currentAgentMessage.content.textContent = `Error: ${error.message}`;
-      currentAgentMessage = null;
-    }
-  } finally {
-    input.disabled = false;
-    form.querySelector("button").disabled = false;
-    input.focus();
-    scrollToBottom();
-  }
 });

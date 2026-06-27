@@ -2,6 +2,7 @@ import requests
 from config import JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN
 import json
 from core.tool_result import ToolResult
+from core.api_trace import ApiTrace
 
 
 class Tool:

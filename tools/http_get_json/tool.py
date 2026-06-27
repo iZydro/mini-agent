@@ -2,6 +2,8 @@ import requests
 from urllib.parse import urlparse
 import json
 from core.tool_result import ToolResult
+from core.api_trace import ApiTrace
+
 
 class Tool:
     name = "http_get_json"
@@ -38,6 +40,12 @@ class Tool:
         r = requests.get(url, timeout=10)
         r.raise_for_status()
 
+        api_trace = ApiTrace.from_response(
+            method="GET",
+            url=url,
+            response=r,
+        ).to_dict()
+
         data = r.json()
 
         return ToolResult(
@@ -45,7 +53,8 @@ class Tool:
             ui={
                 "url": url,
                 "host": parsed.hostname,
-                "status_code": r.status_code
+                "status_code": r.status_code,
+                "api_calls": [api_trace]
             },
             metrics={
                 "bytes": len(r.content)
