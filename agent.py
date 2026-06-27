@@ -56,6 +56,8 @@ def create_initial_messages():
                 "Nunca digas que vas a hacer algo más tarde o que el usuario espere. "
                 "Si necesitas otra tool para completar la tarea, llámala directamente. "
                 "Cuando tengas información suficiente, responde al usuario."
+                "Puedes usar web_search para información reciente o que pueda haber cambiado. "
+                "No inventes datos actuales: si hace falta actualidad, busca en Internet. "
             )
         }
     ]
