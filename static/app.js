@@ -15,10 +15,11 @@ eventSource.onmessage = (event) => {
 
     if (data.type === "llm_request") {
         setAgentStatus("Pensando...");
+        addTraceFromEvent(data, `🤔 Pensando...`);
     }
 
     if (data.type === "tool_start") {
-        addTrace(`🔧 ${data.tool}`);
+        addTraceFromEvent(data, `🔧 ${data.tool}`);
     }
 
     if (data.type === "tool_end") {
@@ -26,51 +27,51 @@ eventSource.onmessage = (event) => {
             ? `${Math.round(data.elapsed_ms)} ms`
             : "? ms";
 
-        addTrace(`✅ ${data.tool} (${elapsed})`);
+        addTraceFromEvent(data, `✅ ${data.tool} (${elapsed})`);
 
         if (data.tool === "web_search" && data.ui) {
             if (data.ui.query) {
-                addTrace(`🌐 Consulta original: ${data.ui.query}`);
+                addTraceFromEvent(data, `🌐 Consulta original: ${data.ui.query}`);
             }
 
             if (data.ui.web_calls?.length) {
-                addTrace("🔎 Búsquedas web:");
+                addTraceFromEvent(data, "🔎 Búsquedas web:");
 
                 for (const call of data.ui.web_calls) {
                     if (call.type === "search") {
-                        addTrace(`   search → ${call.query || "(sin query)"}`);
+                        addTraceFromEvent(data, `   search → ${call.query || "(sin query)"}`);
 
                         if (call.queries?.length > 1) {
                             for (const q of call.queries) {
-                                addTrace(`      • ${q}`);
+                                addTraceFromEvent(data, `      • ${q}`);
                             }
                         }
                     }
 
                     if (call.type === "open_page") {
-                        addTrace(`   open_page → ${call.url}`);
+                        addTraceFromEvent(data, `   open_page → ${call.url}`);
                     }
                 }
             }
 
             if (data.ui.citations?.length) {
-                addTrace("📄 Fuentes:");
+                addTraceFromEvent(data, "📄 Fuentes:");
 
                 for (const citation of data.ui.citations) {
-                    addTrace(`   ${citation.title}`);
+                    addTraceFromEvent(data, `   ${citation.title}`);
                 }
             }
         }
 
         if (data.ui?.api_calls?.length) {
-            addTrace("🌐 API calls:");
+            addTraceFromEvent(data, "🌐 API calls:");
 
             for (const call of data.ui.api_calls) {
-                addTrace(`   ${call.method} ${call.host}${call.path} → ${call.status_code} (${call.elapsed_ms} ms)`);
+                addTraceFromEvent(data, `   ${call.method} ${call.host}${call.path} → ${call.status_code} (${call.elapsed_ms} ms)`);
 
                 if (call.query && Object.keys(call.query).length) {
                     for (const [key, value] of Object.entries(call.query)) {
-                        addTrace(`      ${key}: ${value}`);
+                        addTraceFromEvent(data, `      ${key}: ${value}`);
                     }
                 }
             }
@@ -83,7 +84,7 @@ eventSource.onmessage = (event) => {
             ? `${Math.round(data.elapsed_ms)} ms`
             : "? ms";
 
-        addTrace(`❌ ${data.tool} (${elapsed}): ${data.error}`);
+        addTraceFromEvent(data, `❌ ${data.tool} (${elapsed}): ${data.error}`);
         updateExecutionHeader();
     }
 
@@ -167,6 +168,40 @@ function addAgentMessage() {
         content,
         toolCount: 0
     };
+}
+
+function formatTime(iso) {
+  if (!iso) return "";
+
+  const date = new Date(iso);
+
+  return date.toLocaleTimeString("es-ES", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    fractionalSecondDigits: 3
+  });
+}
+
+function addTraceFromEvent(event, text) {
+  if (!currentAgentMessage) return;
+
+  const div = document.createElement("div");
+  div.className = "trace";
+
+  const time = document.createElement("span");
+  time.className = "trace-time";
+  time.textContent = formatTime(event.timestamp);
+
+  const body = document.createElement("span");
+  body.className = "trace-body";
+  body.textContent = text;
+
+  div.appendChild(time);
+  div.appendChild(body);
+
+  currentAgentMessage.executionBody.appendChild(div);
+  scrollToBottom();
 }
 
 function addTrace(text) {

@@ -108,7 +108,26 @@ header p {
 }
 
 .trace {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   margin: 4px 0;
+  width: 100%;
+}
+
+.trace-time {
+  flex: 0 0 auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #98a2b3;
+  white-space: nowrap;
+}
+
+.trace-body {
+  flex: 1;
+  min-width: 0;
+  color: #667085;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .agent-content {
