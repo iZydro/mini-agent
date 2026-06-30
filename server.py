@@ -12,6 +12,8 @@ from listeners.console import ConsoleListener
 from listeners.transcript import TranscriptListener
 from listeners.sse import SseListener
 from transcript import Transcript
+import asyncio
+
 
 app = FastAPI()
 
@@ -39,8 +41,13 @@ class ChatRequest(BaseModel):
 
 
 @app.get("/health")
-def health():
+async def health():
     return {"status": "ok"}
+
+
+@app.get("/")
+async def root():
+    return FileResponse("static/index.html")
 
 
 @app.post("/chat")
@@ -63,31 +70,22 @@ def chat(request: ChatRequest):
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-@app.get("/")
-def root():
-    return FileResponse("static/index.html")
-
-
-def event_stream():
-
-    while True:
-
-        event = sse.queue.get()
-
-        yield f"data: {json.dumps(event)}\n\n"
-
 
 @app.get("/api/events/{session_id}")
-def stream_events(session_id: str):
-    queue = sse.subscribe(session_id)
+async def stream_events(session_id: str):
+    subscription = sse.subscribe(session_id)
+    loop, queue = subscription
 
-    def event_stream():
+    async def event_stream():
         try:
             while True:
-                event = queue.get()
-                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=15)
+                    yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": ping\n\n"
         finally:
-            sse.unsubscribe(session_id, queue)
+            sse.unsubscribe(session_id, subscription)
 
     return StreamingResponse(
         event_stream(),

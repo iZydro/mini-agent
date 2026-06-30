@@ -1,4 +1,4 @@
-from queue import Queue
+import asyncio
 
 
 class SseListener:
@@ -6,17 +6,20 @@ class SseListener:
         self.queues = {}
 
     def subscribe(self, session_id):
-        queue = Queue()
-        self.queues.setdefault(session_id, []).append(queue)
-        return queue
+        loop = asyncio.get_running_loop()
+        queue = asyncio.Queue()
+        item = (loop, queue)
 
-    def unsubscribe(self, session_id, queue):
+        self.queues.setdefault(session_id, []).append(item)
+        return item
+
+    def unsubscribe(self, session_id, item):
         if session_id not in self.queues:
             return
 
         self.queues[session_id] = [
             q for q in self.queues[session_id]
-            if q is not queue
+            if q is not item
         ]
 
         if not self.queues[session_id]:
@@ -25,5 +28,5 @@ class SseListener:
     def on_event(self, event):
         session_id = event.get("session_id")
 
-        for queue in self.queues.get(session_id, []):
-            queue.put(event)
+        for loop, queue in self.queues.get(session_id, []):
+            loop.call_soon_threadsafe(queue.put_nowait, event)
